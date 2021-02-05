@@ -1,0 +1,74 @@
+library(BB)
+library(numDeriv)
+library(mgcv)
+library(MASS)
+
+#-------------------------------------------
+xstart1=c(0,100,0,100,50)
+xstart2=c(0,0,100,100,50)
+xstart=cbind(xstart1,xstart2)
+n=nrow(xstart)
+#-------------------------------------------
+wstart=c(rep((1/n),n))
+theta.start=c(1513,6.59,1.35,1.35) 
+#-------------------------------------------
+x1=seq(0,100,length=225)
+x2=seq(0,100,length=225)
+grid=expand.grid(x1,x2)
+#-------------------------------------------
+max.iter=50
+#-------------------------------------------
+iter=0
+#-------------------------------------------
+while(iter< max.iter){
+  
+iter=iter+1
+plot(iter,xlim=c(iter-1,iter+1))
+text(x=iter+1,y=iter,iter,col="red")
+
+#------------------------------------------------------------------------------------
+Mixed.Inhibition.model=function(par,xmat){
+(par[1]*xmat[,1])/((par[2]*(1+(xmat[,2]/par[3])))+(xmat[,1]*(1+(xmat[,2]/par[4]))))
+}
+  
+#------------------------------------------------------------------------------------
+#                               X.HAT
+#------------------------------------------------------------------------------------
+
+F.mat=jacobian(func=Mixed.Inhibition.model, x=theta.start, method="Richardson",xmat=xstart) 
+W=diag(wstart)
+M.mat=t(F.mat)%*%W%*%F.mat
+   
+f=jacobian(func=Mixed.Inhibition.model,x=theta.start, method="Richardson",xmat=grid)
+
+d.funct=function(xx){
+d=t(xx)%*%ginv(M.mat)%*%(xx)
+d
+}
+  
+d.value=apply(f, 1, d.funct)
+xhat=c(grid[which.max(d.value),1],grid[which.max(d.value),2])
+
+#------------------------------------------------------------------------------------
+
+xstart=rbind(xstart,xhat)
+alpha=1/(iter+1)
+wstart=c(((1-alpha)*wstart),alpha)
+design=cbind(xstart,wstart)
+n=nrow(xstart)
+  
+} 
+#----------------------------------------------------------------
+design1.uniq=uniquecombs(design[,-3])
+count1=attr(design1.uniq,"index")
+count22=unique(sort(count1))
+#----------------------------------------------------------------
+weight=numeric(nrow(design1.uniq))
+for(j in 1:length(count22)){
+  m=which(count1==count22[j])
+  weight[j]=sum(design[m,3])
+}
+#----------------------------------------------------------------
+design.opt=cbind(design1.uniq,weight)
+mm=which(design.opt[,3]>0.005)
+design.opt[mm,]
